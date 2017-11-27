@@ -51,6 +51,8 @@ class FlowSensor(SensorActive):
         except Exception as e:
             print e
 
+        SensorActive.init(self)
+
     #-------------------------------------------------------------------------------
     def pulseInput(self, channel):
         self.pulseCount += 1
@@ -95,6 +97,81 @@ class FlowSensor(SensorActive):
         return unit
 
 ################################################################################
+@cbpi.sensor
+class SimulatedFlowSensor(SensorActive):
+
+    a_flow_actor_prop = Property.Actor("Actor", description="The actor this sensor responds to")
+    a_flow_rate_prop = Property.Number("Flow Rate", configurable=True, default_value=2)
+    b_display_prop = Property.Select("Display", options=["Volume", "Flow"])
+    c_volume_units_prop = Property.Select("Volume Units", options=["L","gal","qt"], description="Some text")
+    d_time_units_prop = Property.Select("Flow Time Units", options=["/sec","/min"])
+
+    #-------------------------------------------------------------------------------
+    def init(self):
+        try:
+            self.flow_rate = float(self.a_flow_rate_prop)
+            self.flow_actorID = int(self.a_flow_actor_prop)
+        except:
+            self.flow_rate = 0.0
+            self.flow_actorID = None
+
+        self.flowDisplay = self.b_display_prop == "Flow"
+        self.flowMinute = self.d_time_units_prop == "/min"
+        if self.c_volume_units_prop not in ["L","gal","qt"]:
+            self.volumeUnit = "Units"
+        else:
+            self.volumeUnit = self.c_volume_units_prop
+
+        if self.flowMinute:
+            self.flow_period_adjust = 1.0/60.0
+        else:
+            self.flow_period_adjust = 1.0
+
+        self.volume = 0.0
+        self.flow = 0.0
+
+        SensorActive.init(self)
+
+    #-------------------------------------------------------------------------------
+    def execute(self):
+        # at startup, wait for actors to initialze
+        while cbpi.cache.get("actors") is None:
+            self.sleep(5)
+
+        while self.is_running():
+            flow_device = cbpi.cache.get("actors").get(self.flow_actorID, None)
+
+            if flow_device and int(flow_device.state):
+                self.volume += self.flow_rate * (float(flow_device.power) / 100.0) * self.flow_period_adjust
+                self.flow = self.flow_rate
+            else:
+                self.flow = 0.0
+
+            if self.flowDisplay:
+                value = self.flow
+            else:
+                value = self.volume
+            self.data_received("{:.2f}".format(value))
+
+            self.sleep(1)
+
+    #-------------------------------------------------------------------------------
+    def reset(self):
+        self.volume = 0.0
+
+    #-------------------------------------------------------------------------------
+    @cbpi.action("Reset volume to zero")
+    def resetButton(self):
+        self.reset()
+
+    #-------------------------------------------------------------------------------
+    def get_unit(self):
+        unit = self.c_volume_units_prop
+        if self.b_display_prop == "Flow":
+            unit += self.d_time_units_prop
+        return unit
+
+################################################################################
 @cbpi.step
 class FlowSensorStep(StepBase):
     a_sensor_prop = StepProperty.Sensor("Sensor")
@@ -107,10 +184,6 @@ class FlowSensorStep(StepBase):
 
     #-------------------------------------------------------------------------------
     def init(self):
-        # for key, value in cbpi.cache.get("sensors").iteritems():
-        #     if key == int(self.a_sensor_prop):
-        #         self.sensor = value.instance
-        #         break
         self.sensor = cbpi.cache.get("sensors")[int(self.a_sensor_prop)].instance
         self.actors = [self.b_actor1_prop, self.c_actor2_prop]
         try:
@@ -173,10 +246,6 @@ class FlowSensorCalibrate(StepBase):
     #-------------------------------------------------------------------------------
     def init(self):
         self.actor = int(self.actor_prop)
-        # for key, value in cbpi.cache.get("sensors").iteritems():
-        #     if key == int(self.a_sensor_prop):
-        #         self.sensor = value.instance
-        #         break
         self.sensor = cbpi.cache.get("sensors")[int(self.a_sensor_prop)].instance
         self.threshold = float(self.threshold_prop)
         self.flowing = False
@@ -211,10 +280,6 @@ class FlowSensorReset(StepBase):
 
     #-------------------------------------------------------------------------------
     def init(self):
-        # for key, value in cbpi.cache.get("sensors").iteritems():
-        #     if key == int(self.a_sensor_prop):
-        #         self.sensor = value.instance
-        #         break
         self.sensor = cbpi.cache.get("sensors")[int(self.a_sensor_prop)].instance
         self.sensor.reset()
         self.next()
