@@ -31,17 +31,17 @@ class FlowSensor(SensorActive):
     #-------------------------------------------------------------------------------
     def init(self):
         self.gpio = int(self.a_gpio_prop)
-        self.flowDisplay = self.b_display_prop == "Flow"
-        self.flowMinute = self.d_time_units_prop == "/min"
+        self.flow_display = self.b_display_prop == "Flow"
+        self.per_minute = self.d_time_units_prop == "/min"
         self.calibration = float(self.e_calibration_units_prop)/float(self.f_calibration_count_prop)
         if self.c_volume_units_prop not in ["L","gal","qt"]:
-            self.volumeUnit = "Units"
+            self.volume_units = "Units"
         else:
-            self.volumeUnit = self.c_volume_units_prop
+            self.volume_units = self.c_volume_units_prop
 
-        self.pulseCount = 0
-        self.lastCount = 0
-        self.lastTime = time.time()
+        self.pulse_count = 0
+        self.last_count = 0
+        self.last_time = time.time()
         self.volume = 0.0
         self.flow = 0.0
 
@@ -55,25 +55,25 @@ class FlowSensor(SensorActive):
 
     #-------------------------------------------------------------------------------
     def pulseInput(self, channel):
-        self.pulseCount += 1
+        self.pulse_count += 1
 
     #-------------------------------------------------------------------------------
     def datum(self):
         now = time.time()
-        count = self.pulseCount
-        countDelta = count - self.lastCount
+        count = self.pulse_count
+        count_delta = count - self.last_count
         self.volume = count * self.calibration
-        self.flow = (countDelta * self.calibration)/(now - self.lastTime)
-        if self.flowMinute:
+        self.flow = (count_delta * self.calibration)/(now - self.last_time)
+        if self.per_minute:
             self.flow /= 60.0
-        self.lastCount = count
-        self.lastTime = now
+        self.last_count = count
+        self.last_time = now
 
     #-------------------------------------------------------------------------------
     def execute(self):
         while self.is_running():
             self.datum()
-            if self.flowDisplay:
+            if self.flow_display:
                 value = self.flow
             else:
                 value = self.volume
@@ -82,7 +82,7 @@ class FlowSensor(SensorActive):
 
     #-------------------------------------------------------------------------------
     def reset(self):
-        self.pulseCount = self.lastCount = 0
+        self.pulse_count = self.last_count = 0
 
     #-------------------------------------------------------------------------------
     @cbpi.action("Reset volume to zero")
@@ -110,19 +110,19 @@ class SimulatedFlowSensor(SensorActive):
     def init(self):
         try:
             self.flow_rate = float(self.a_flow_rate_prop)
-            self.flow_actorID = int(self.a_flow_actor_prop)
+            self.flow_actor = int(self.a_flow_actor_prop)
         except:
             self.flow_rate = 0.0
-            self.flow_actorID = None
+            self.flow_actor = None
 
-        self.flowDisplay = self.b_display_prop == "Flow"
-        self.flowMinute = self.d_time_units_prop == "/min"
+        self.flow_display = self.b_display_prop == "Flow"
+        self.per_minute = self.d_time_units_prop == "/min"
         if self.c_volume_units_prop not in ["L","gal","qt"]:
-            self.volumeUnit = "Units"
+            self.volume_units = "Units"
         else:
-            self.volumeUnit = self.c_volume_units_prop
+            self.volume_units = self.c_volume_units_prop
 
-        if self.flowMinute:
+        if self.per_minute:
             self.flow_period_adjust = 1.0/60.0
         else:
             self.flow_period_adjust = 1.0
@@ -139,7 +139,7 @@ class SimulatedFlowSensor(SensorActive):
             self.sleep(5)
 
         while self.is_running():
-            flow_device = cbpi.cache.get("actors").get(self.flow_actorID, None)
+            flow_device = cbpi.cache.get("actors").get(self.flow_actor, None)
 
             if flow_device and int(flow_device.state):
                 self.volume += self.flow_rate * (float(flow_device.power) / 100.0) * self.flow_period_adjust
@@ -147,7 +147,7 @@ class SimulatedFlowSensor(SensorActive):
             else:
                 self.flow = 0.0
 
-            if self.flowDisplay:
+            if self.flow_display:
                 value = self.flow
             else:
                 value = self.volume
@@ -187,18 +187,18 @@ class FlowSensorStep(StepBase):
         self.sensor = cbpi.cache.get("sensors")[int(self.a_sensor_prop)].instance
         self.actors = [self.b_actor1_prop, self.c_actor2_prop]
         try:
-            self.volume = float(self.d_volume_prop)
+            self.target_volume = float(self.d_volume_prop)
             self.until_empty = False
         except:
-            self.volume = 0.0
+            self.target_volume = 0.0
             self.until_empty = True
-        self.resetStart = self.e_resetStart_prop == "Yes"
-        self.resetEnd = self.f_resetEnd_prop == "Yes"
+        self.reset_start = self.e_resetStart_prop == "Yes"
+        self.reset_end = self.f_resetEnd_prop == "Yes"
         try: self.threshold = float(self.g_threshold_prop)
         except: self.threshold = 0.01
         self.flowing = False
 
-        if self.resetStart:
+        if self.reset_start:
             self.sensor.reset()
         self.actors_on()
 
@@ -209,8 +209,8 @@ class FlowSensorStep(StepBase):
     #-------------------------------------------------------------------------------
     def finish(self):
         self.actors_off()
-        cbpi.notify("Flow Sensor Step Complete", "Total Volume: {:.2f} {}".format(self.sensor.volume, self.sensor.volumeUnit), timeout=None)
-        if self.resetEnd:
+        cbpi.notify("Flow Sensor Step Complete", "Total Volume: {:.2f} {}".format(self.sensor.volume, self.sensor.volume_units), timeout=None)
+        if self.reset_end:
             self.sensor.reset()
 
     #-------------------------------------------------------------------------------
@@ -221,7 +221,7 @@ class FlowSensorStep(StepBase):
             elif (self.flowing) and (self.sensor.flow <= self.threshold):
                 self.next()
         else:
-            if self.sensor.volume >= self.volume:
+            if self.sensor.volume >= self.target_volume:
                 self.next()
 
     #-------------------------------------------------------------------------------
@@ -262,7 +262,7 @@ class FlowSensorCalibrate(StepBase):
     #-------------------------------------------------------------------------------
     def finish(self):
         self.actor_off(self.actor)
-        cbpi.notify("Flow Sensor Calibration Complete", "Pulse Count: {}".format(self.sensor.pulseCount), timeout=None)
+        cbpi.notify("Flow Sensor Calibration Complete", "Pulse Count: {}".format(self.sensor.pulse_count), timeout=None)
 
     #-------------------------------------------------------------------------------
     def execute(self):
