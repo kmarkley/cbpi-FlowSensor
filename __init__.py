@@ -21,7 +21,7 @@ except Exception as e:
 class PulseCounter(object):
     #-------------------------------------------------------------------------------
     def __init__(self, gpio):
-        self.pulse_count = 0
+        self.count = 0
         try:
             GPIO.setup(gpio, GPIO.IN, pull_up_down=GPIO.PUD_UP)
             GPIO.add_event_detect(gpio, GPIO.RISING, callback=self.pulse_input, bouncetime=20)
@@ -30,7 +30,7 @@ class PulseCounter(object):
             cbpi.app.logger.error("Failure to initialize FlowSensor pulse counter \n{}".format(e))
     #-------------------------------------------------------------------------------
     def pulse_input(self, channel):
-        self.pulse_count += 1
+        self.count += 1
 
 
 ################################################################################
@@ -43,7 +43,7 @@ class FlowSensor(SensorActive):
     e_calibration_units_prop = Property.Number("Calibration Units", configurable=True, default_value=1, description="Actual units transferred during calibration test")
     f_calibration_count_prop = Property.Number("Calibration Count", configurable=True, default_value=485, description="Reported pulse count from calibration test")
 
-    counter = dict()
+    counters = dict()
 
     #-------------------------------------------------------------------------------
     def init(self):
@@ -54,11 +54,11 @@ class FlowSensor(SensorActive):
         self.period_adjust = 60.0 if (self.d_time_units_prop == "/m") else 1.0
         self.calibration = float(self.e_calibration_units_prop)/float(self.f_calibration_count_prop)
 
-        if not self.counter.get(self.gpio):
-            self.counter[self.gpio] = PulseCounter(self.gpio)
+        if not FlowSensor.counters.get(self.gpio):
+            FlowSensor.counters[self.gpio] = PulseCounter(self.gpio)
 
-        self.reset_count = self.counter[self.gpio].pulse_count
-        self.last_count = self.reset_count
+        self.reset_count = FlowSensor.counters[self.gpio].count
+        self.pulse_count = self.last_count = 0
         self.last_time = time.time()
         self.volume = 0.0
         self.flow = 0.0
@@ -68,11 +68,11 @@ class FlowSensor(SensorActive):
     #-------------------------------------------------------------------------------
     def update_values(self):
         now = time.time()
-        pulse_count = self.counter[self.gpio].pulse_count - self.reset_count
-        count_delta = pulse_count - self.last_count
-        self.volume = pulse_count * self.calibration
+        self.pulse_count = FlowSensor.counters[self.gpio].count - self.reset_count
+        count_delta = self.pulse_count - self.last_count
+        self.volume = self.pulse_count * self.calibration
         self.flow = (count_delta * self.calibration)/(now - self.last_time) * self.period_adjust
-        self.last_count = pulse_count
+        self.last_count = self.pulse_count
         self.last_time = now
 
     #-------------------------------------------------------------------------------
@@ -87,8 +87,8 @@ class FlowSensor(SensorActive):
 
     #-------------------------------------------------------------------------------
     def reset(self):
-        self.reset_count = self.counter[self.gpio].pulse_count
-        self.last_count = self.reset_count
+        self.reset_count = FlowSensor.counters[self.gpio].count
+        self.pulse_count = self.last_count = 0
 
     #-------------------------------------------------------------------------------
     @cbpi.action("Reset Volume")
