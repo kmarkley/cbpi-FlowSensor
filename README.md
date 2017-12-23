@@ -1,7 +1,5 @@
 ## Flow Sensor
 
-Yet another CraftBeerPi3 plugin for hall effect flow sensors.
-
 ### Sensors
 ##### FlowSensor
 * Use any units you prefer: drams, cups, decaliters, barrels, whatever

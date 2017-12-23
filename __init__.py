@@ -26,6 +26,7 @@ class PulseCounter(object):
             GPIO.add_event_detect(gpio, GPIO.RISING, callback=self.pulse_input, bouncetime=20)
             cbpi.app.logger.info("FlowSensor pulse counter initialized for GPIO {}".format(gpio))
         except Exception as e:
+            cbpi.notify("Failure to initialize FlowSensor pulse counter", "Could not create callback for GPIO {}".format(gpio), type="danger", timeout="None")
             cbpi.app.logger.error("Failure to initialize FlowSensor pulse counter \n{}".format(e))
 
     #-------------------------------------------------------------------------------
@@ -261,7 +262,7 @@ class FlowSensorCalibrate(StepBase):
     # properties
     actor_prop = StepProperty.Actor("Actor")
     sensor_prop = StepProperty.Sensor("Sensor")
-    timer_prop = Property.Number("Timer", configurable=True)
+    timer_prop = Property.Number("Timer", configurable=True, default_value=10)
     threshold_prop = Property.Number("Flow threshold", configurable=True, default_value=0.05,  description="Value at which flow is considered stopped")
 
     #-------------------------------------------------------------------------------
@@ -278,8 +279,7 @@ class FlowSensorCalibrate(StepBase):
         self.actor_on(self.actor)
         # start timer
         if self.is_timer_finished() is None:
-            self.start_timer(int(self.timer_prop) * 60)
-            self.start_timer(360)
+            self.start_timer(float(self.timer_prop) * 60)
 
     #-------------------------------------------------------------------------------
     def execute(self):
