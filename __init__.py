@@ -194,7 +194,7 @@ class FlowSensorTransfer(StepBase):
     d_volume_prop = Property.Number("Target Volume", configurable=True, description="Leave blank to continue until flow stops")
     e_reset_start_prop = Property.Select("Reset sensor at start?", options=["Yes","No"])
     f_reset_finish_prop = Property.Select("Reset sensor at finish?", options=["Yes","No"])
-    g_threshold_prop = Property.Number("Flow threshold", configurable=True, default_value=0.05, description="Value at which flow is considered stopped")
+    g_threshold_prop = Property.Number("Flow threshold", configurable=True, default_value=0.1, description="Value at which flow is considered stopped")
 
     #-------------------------------------------------------------------------------
     def init(self):
@@ -263,7 +263,7 @@ class FlowSensorCalibrate(StepBase):
     actor_prop = StepProperty.Actor("Actor")
     sensor_prop = StepProperty.Sensor("Sensor")
     timer_prop = Property.Number("Timer", configurable=True, default_value=10)
-    threshold_prop = Property.Number("Flow threshold", configurable=True, default_value=0.05,  description="Value at which flow is considered stopped")
+    threshold_prop = Property.Number("Flow threshold", configurable=True, default_value=0.1,  description="Value at which flow is considered stopped")
 
     #-------------------------------------------------------------------------------
     def init(self):
@@ -283,11 +283,11 @@ class FlowSensorCalibrate(StepBase):
 
     #-------------------------------------------------------------------------------
     def execute(self):
-        data = self.sensor.read_sensor_data()
-        if (not self.flowing) and (data['flow'] >= self.threshold):
+        sensor_data = self.sensor.read_sensor_data()
+        if (not self.flowing) and (sensor_data['flow'] >= self.threshold):
             # flow has started
             self.flowing = True
-        elif (self.flowing) and (data['flow'] <= self.threshold):
+        elif (self.flowing) and (sensor_data['flow'] <= self.threshold):
             # flow has stopped
             self.next()
         elif self.is_timer_finished() == True:
