@@ -220,12 +220,15 @@ class FlowSensorTransfer(StepBase):
         sensor_data = self.sensor.read_sensor_data()
         if (not self.flowing) and (sensor_data['flow'] >= self.threshold):
             # flow has started
+            cbpi.app.logger.info("FlowSensor '{}' transfer flow started".format(self.sensor.name))
             self.flowing = True
         elif (self.flowing) and (sensor_data['flow'] <= self.threshold):
             # flow has stopped
+            cbpi.app.logger.info("FlowSensor '{}' transfer flow stopped".format(self.sensor.name))
             self.next()
         elif self.target_volume and (sensor_data['volume'] >= self.target_volume):
             # target volume reached
+            cbpi.app.logger.info("FlowSensor '{}' transfer target volume reached".format(self.sensor.name))
             self.next()
 
     #-------------------------------------------------------------------------------
@@ -286,12 +289,15 @@ class FlowSensorCalibrate(StepBase):
         sensor_data = self.sensor.read_sensor_data()
         if (not self.flowing) and (sensor_data['flow'] >= self.threshold):
             # flow has started
+            cbpi.app.logger.info("FlowSensor '{}' calibrate flow started".format(self.sensor.name))
             self.flowing = True
         elif (self.flowing) and (sensor_data['flow'] <= self.threshold):
             # flow has stopped
+            cbpi.app.logger.info("FlowSensor '{}' calibrate flow stopped".format(self.sensor.name))
             self.next()
         elif self.is_timer_finished() == True:
             # timer has expired
+            cbpi.app.logger.info("FlowSensor '{}' calibrate timer expired".format(self.sensor.name))
             self.next()
 
     #-------------------------------------------------------------------------------
