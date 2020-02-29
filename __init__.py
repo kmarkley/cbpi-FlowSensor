@@ -64,10 +64,12 @@ class FlowSensor(SensorActive):
     #-------------------------------------------------------------------------------
     @classmethod
     def get_gpio_pulse_rate(cls, gpio):
+        last = cls._gpio_counters[gpio].last
+        prior = cls._gpio_counters[gpio].prior
         # time between last 2 pulses
-        delta1 = cls._gpio_counters[gpio].last - cls._gpio_counters[gpio].prior
+        delta1 = last - prior
         # time between last pulse and now
-        delta2 = time.time() - cls._gpio_counters[gpio].last
+        delta2 = time.time() - last
         # inverse of secs between pulses is pulses/sec
         return 1.0/max(delta1, delta2)
 
@@ -206,7 +208,7 @@ class FlowSensorTransfer(StepBase):
         self.reset_start = self.e_reset_start_prop == "Yes"
         self.reset_finish = self.f_reset_finish_prop == "Yes"
         try: self.threshold = float(self.g_threshold_prop)
-        except: self.threshold = 0.01
+        except: self.threshold = 0.1
         self.flowing = False
 
         # reset sensor volume if indicated
